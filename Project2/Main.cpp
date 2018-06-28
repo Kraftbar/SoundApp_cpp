@@ -7,8 +7,35 @@
 #include <endpointvolume.h>
 #include <typeinfo>
 
+float getVolume()
+{
 
+	HRESULT hr = NULL;
+	bool decibels = false;
+	bool scalar = false;
 
+	CoInitialize(NULL);
+	IMMDeviceEnumerator *deviceEnumerator = NULL;
+	hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER,
+		__uuidof(IMMDeviceEnumerator), (LPVOID *)&deviceEnumerator);
+	IMMDevice *defaultDevice = NULL;
+
+	hr = deviceEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice);
+	deviceEnumerator->Release();
+	deviceEnumerator = NULL;
+
+	IAudioEndpointVolume *endpointVolume = NULL;
+	hr = defaultDevice->Activate(__uuidof(IAudioEndpointVolume),
+		CLSCTX_INPROC_SERVER, NULL, (LPVOID *)&endpointVolume);
+	defaultDevice->Release();
+	defaultDevice = NULL;
+
+	// -------------------------
+	float currentVolume = 0;
+	endpointVolume->GetMasterVolumeLevel(&currentVolume);
+
+	return pow(10, currentVolume / 20);
+}
 
 // www.codeproject.com/Tips/233484/Change-Master-Volume-in-Visual-Cplusplus
 bool ChangeVolume(double nVolume, bool bScalar)
@@ -38,7 +65,10 @@ bool ChangeVolume(double nVolume, bool bScalar)
 	// -------------------------
 	float currentVolume = 0;
 	endpointVolume->GetMasterVolumeLevel(&currentVolume);
-	//printf("Current volume in dB is: %f\n", currentVolume);
+	printf("Current volume in dB is: %f\n", currentVolume);
+	printf("Current volume is riktig: %f\n", pow(10, currentVolume / 20));
+
+
 
 	hr = endpointVolume->GetMasterVolumeLevelScalar(&currentVolume);
 	//CString strCur=L"";
@@ -63,12 +93,17 @@ bool ChangeVolume(double nVolume, bool bScalar)
 
 
 
+// Den spiller av på 40 prosent
+// Et table med alle styrkene så man vet hva som ikke er normalt
+
 
 // www.dreamincode.net/forums/topic/184668-getting-microphone-input/
 int main()
 {
+	float refVol = getVolume();
 
-	ChangeVolume(0.2, 70);
+
+
 
 	ALCdevice *dev[2];
 	ALCcontext *ctx;
@@ -106,16 +141,42 @@ int main()
 		if (val <= 0)
 			continue;
 
-		std::cout << "Val: " << val << std::endl;
+
 		/* Check how much audio data has been captured (note that 'val' is the
 		* number of frames, not bytes) */
 		alcGetIntegerv(dev[1], ALC_CAPTURE_SAMPLES, 1, &val);
 
 		/* Read the captured audio */
 		alcCaptureSamples(dev[1], data, val);
-		std::cout << "Datasize: " << int(data[300]) << std::endl;
 
+
+		// -------------------------------------------------------------
+
+
+
+		float sum = 0;
+		for (int i = 0; i < 5000; i++) {
+			 sum += data[i];
+			//if (sum<data[i]) {
+			//	sum = data[i]*10;
+			//}
+		}
+		float roomVol = sum / 5000;
 		
+		
+		for (int i = 0; i<roomVol*23;i++) {
+			std::cout << "-";
+		
+		}
+		std::cout<<""<<std::endl;
+
+		if (refVol*100<roomVol) {
+			// ChangeVolume(int(data[15]) / double(100), 70);
+			
+			// ChangeVolume(roomVol, 0);
+			
+		}
+		// -------------------------------------------------------------
 
 		
 		/* Pop the oldest finished buffer, fill it with the new capture data,
